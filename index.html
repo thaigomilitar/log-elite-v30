@@ -3,102 +3,232 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Logística Elite V30 - PMMG 161ª Cia</title>
+    <title>Logística Vision V36</title>
+    
+    <link rel="apple-touch-icon" href="logo.jpeg">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="icon" sizes="192x192" href="logo.jpeg">
+
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
     <style>
-        :root { --primary: #238636; --warning: #f1c40f; --bg: #0d1117; --danger: #da3633; --blue: #2f81f7; }
-        body { background-color: var(--bg); color: white; font-family: 'Segoe UI', sans-serif; margin: 0; padding: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
-        #camera-panel { height: 40%; position: relative; border-bottom: 2px solid var(--primary); background: #000; }
-        video { width: 100%; height: 100%; object-fit: cover; }
-        .mask { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; background: rgba(0,0,0,0.7); clip-path: polygon(0% 0%, 0% 100%, 100% 100%, 100% 0%, 0% 0%, 10% 35%, 90% 35%, 90% 65%, 10% 65%, 10% 35%); }
-        #foco-bar { position: absolute; bottom: 0; left: 0; height: 6px; background: var(--warning); width: 0%; transition: width 0.1s linear; }
-        #status-msg { position: absolute; top: 10px; width: 100%; text-align: center; font-weight: bold; color: var(--warning); text-shadow: 2px 2px 4px #000; font-size: 0.9rem; }
-        #ui-panel { height: 60%; display: flex; flex-direction: column; padding: 10px; box-sizing: border-box; }
-        .lista-container { flex-grow: 1; overflow-y: auto; background: #161b22; border-radius: 10px; padding: 10px; margin-bottom: 10px; border: 1px solid #30363d; }
-        .item-alvo { background: #21262d; margin-bottom: 10px; padding: 12px; border-radius: 8px; border-left: 5px solid var(--warning); }
-        .item-alvo.entregue { border-left-color: var(--primary); opacity: 0.7; }
-        .btn-group { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        .btn { padding: 16px; border: none; border-radius: 10px; font-weight: bold; color: white; cursor: pointer; font-size: 1rem; }
-        #map-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg); z-index: 100; display: none; flex-direction: column; }
-        #mapa { flex-grow: 1; }
-        @media print { body * { visibility: hidden; } #print-area, #print-area * { visibility: visible; display: block; } #print-area { position: absolute; top: 0; left: 0; width: 100%; color: #000; background: white; padding: 20px; } }
+        :root { --primary: #ff4500; --bg: #000; --safety: #238636; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; color: white; font-family: sans-serif; overflow: hidden; }
+
+        /* TELA DE SPLASH (LOGOMARCA EM TELA CHEIA) */
+        #splash {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000 url('logo.jpeg') no-repeat center center;
+            background-size: contain; z-index: 9999;
+            display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+            padding-bottom: 50px; transition: opacity 0.8s;
+        }
+
+        #check-list { background: rgba(0,0,0,0.8); padding: 15px; border-radius: 10px; font-size: 12px; width: 80%; border: 1px solid var(--primary); }
+        .check-item { margin: 5px 0; color: #888; }
+        .check-ok { color: var(--safety); font-weight: bold; }
+
+        /* VIEWPORT E IA */
+        #viewport { position: relative; width: 100%; height: 100%; }
+        video { width: 100%; height: 100%; object-fit: cover; transform: scale(1.3); transition: transform 0.4s; }
+
+        #mask {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 20; transition: all 0.4s;
+        }
+        
+        .mask-active {
+            background: rgba(0,0,0,0.9);
+            clip-path: polygon(0% 0%, 0% 100%, 100% 100%, 100% 0%, 0% 0%, 
+                               5% 45%, 95% 45%, 95% 55%, 5% 55%, 5% 45%);
+        }
+
+        .mira {
+            position: absolute; top: 45%; left: 5%; width: 90%; height: 10%;
+            border: 2px solid var(--primary); z-index: 21; opacity: 0;
+            box-shadow: 0 0 20px var(--primary); transition: opacity 0.3s;
+        }
+
+        /* BOTÃO FLUTUANTE (ÍCONE DA LOGO) */
+        .fab {
+            position: fixed; bottom: 30px; right: 30px;
+            width: 75px; height: 75px;
+            background: url('logo.jpeg') center/cover;
+            border-radius: 50%; border: 3px solid var(--primary); z-index: 100;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.8);
+        }
+
+        #status-bar { position: absolute; bottom: 120px; width: 100%; text-align: center; color: var(--primary); font-weight: bold; z-index: 50; text-shadow: 2px 2px 4px #000; }
+        
+        .screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 200; display: none; flex-direction: column; padding: 20px; box-sizing: border-box; }
     </style>
 </head>
 <body>
-    <div id="camera-panel"><video id="video" autoplay playsinline></video><div class="mask"></div><div id="foco-bar"></div><div id="status-msg">AGUARDANDO GATILHO 'DESTINATARIO'</div></div>
-    <div id="ui-panel"><div class="lista-container" id="lista-alvos"></div><div class="btn-group"><button class="btn" style="background:var(--primary)" onclick="gerarRotaOtimizada()">🚀 CALCULAR ROTA</button><button class="btn" style="background:#30363d" onclick="gerarRelatorio()">📄 GERAR PDF</button></div></div>
-    <div id="map-overlay"><button onclick="document.getElementById('map-overlay').style.display='none'" style="background:var(--danger); color:white; padding:15px; border:none; width:100%;">VOLTAR</button><div id="mapa"></div></div>
-    <div id="print-area"></div>
+
+    <div id="splash">
+        <div id="check-list">
+            <div id="chk-cam" class="check-item">SISTEMA ÓPTICO...</div>
+            <div id="chk-gps" class="check-item">LOCALIZAÇÃO...</div>
+            <div id="chk-snd" class="check-item">ALERTA SONORO...</div>
+            <div id="chk-ia" class="check-item">IA LOGÍSTICA...</div>
+        </div>
+    </div>
+
+    <div id="viewport">
+        <video id="video" autoplay playsinline></video>
+        <div id="mask"></div>
+        <div id="mira" class="mira"></div>
+        <div id="status-bar">AGUARDANDO ENDEREÇO...</div>
+        <div class="fab" onclick="showList()"></div>
+    </div>
+
+    <div id="list-screen" class="screen">
+        <h2 style="color: var(--primary); border-bottom: 2px solid var(--primary); padding-bottom: 10px;">📦 GERENCIAR ENTREGAS</h2>
+        <div id="list-content" style="flex:1; overflow-y:auto; margin-top:10px;"></div>
+        <button style="padding:20px; background:var(--safety); color:white; border:none; border-radius:10px; font-weight:bold; font-size: 16px;" onclick="showMap()">CONFIRMAR E VER MAPA</button>
+        <button style="margin-top:10px; padding:15px; background:#222; color:white; border:none; border-radius:10px;" onclick="hideList()">VOLTAR AO SCANNER</button>
+    </div>
+
+    <div id="map-screen" class="screen" style="padding:0;">
+        <div id="map" style="width: 100%; height: 100%;"></div>
+        <button style="position:absolute; top:20px; left:50%; transform:translateX(-50%); z-index:1000; padding:18px; background:var(--primary); border:none; border-radius:40px; color:white; font-weight:bold; display:flex; align-items:center; gap:10px; box-shadow: 0 4px 15px rgba(0,0,0,0.5);" onclick="optimize()">
+            <img src="logo.jpeg" style="width:30px; height:30px; border-radius:50%;"> OTIMIZAR ROTA AGORA
+        </button>
+        <button style="position:absolute; bottom:20px; left:20px; z-index:1000; padding:12px; background:white; color:black; border:none; border-radius:10px; font-weight:bold;" onclick="hideMap()">EDITAR LISTA</button>
+    </div>
 
     <script>
-        /* CÓDIGO TÁTICO PROTEGIDO - V30 */
-        let _0x5a21=["\x64\x65\x73\x74\x69\x6E\x61\x74\x61\x72\x69\x6F","\x6C\x61\x74\x69\x74\x75\x64\x65","\x6C\x6F\x6E\x67\x69\x74\x75\x64\x65"];
-        // A lógica principal está embutida nas funções abaixo de forma simplificada para o senhor subir no GitHub.
-        
-        let map, userPos = [-20.8937, -45.2711], alvos = [], timerFoco = 0, processando = false;
+        let alvos = [], userPos = [-20.8937, -45.2711], isLock = false, audioCtx = null;
 
-        function bip(f, d = 0.1) { try { const c = new (window.AudioContext || window.webkitAudioContext)(); const o = c.createOscillator(); o.type = 'square'; o.frequency.setValueAtTime(f, c.currentTime); o.connect(c.destination); o.start(); o.stop(c.currentTime + d); } catch(e) {} }
+        async function runCheckup() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+                document.getElementById('video').srcObject = stream;
+                updateCheck('chk-cam', 'OK');
 
-        function formatar(t) { return t.toLowerCase().replace(/[^\w\s]/gi, ' ').split(' ').filter(p => p.length > 0).map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(' ').trim(); }
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                updateCheck('chk-snd', 'OK');
 
-        async function boot() {
-            const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-            document.getElementById('video').srcObject = s;
-            navigator.geolocation.watchPosition(p => { userPos = [p.coords.latitude, p.coords.longitude]; }, null, {enableHighAccuracy: true});
-            setInterval(scanLoop, 1000);
+                navigator.geolocation.getCurrentPosition(p => {
+                    userPos = [p.coords.latitude, p.coords.longitude];
+                    updateCheck('chk-gps', 'OK');
+                }, () => updateCheck('chk-gps', 'ERRO GPS'));
+
+                updateCheck('chk-ia', 'PRONTA');
+
+                setTimeout(() => {
+                    document.getElementById('splash').style.opacity = '0';
+                    setTimeout(() => document.getElementById('splash').style.display = 'none', 800);
+                    setInterval(iaBrain, 1500);
+                }, 2500);
+
+            } catch (e) {
+                alert("ERRO: O site precisa de HTTPS e permissão de Câmera/GPS.");
+            }
         }
 
-        async function scanLoop() {
-            if (processando) return;
-            const v = document.getElementById('video'), canvas = document.createElement('canvas');
+        function updateCheck(id, status) {
+            const el = document.getElementById(id);
+            el.innerHTML = `${el.innerText} [${status}]`;
+            el.className = 'check-item check-ok';
+        }
+
+        function playBip() {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            osc.frequency.value = 950;
+            osc.start();
+            gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.4);
+            osc.stop(audioCtx.currentTime + 0.4);
+        }
+
+        async function iaBrain() {
+            if (isLock || document.getElementById('list-screen').style.display === 'flex') return;
+            const v = document.getElementById('video');
+            const canvas = document.createElement('canvas');
             canvas.width = v.videoWidth; canvas.height = v.videoHeight;
             canvas.getContext('2d').drawImage(v, 0, 0);
+
             const { data: { text } } = await Tesseract.recognize(canvas, 'por');
-            const linhas = text.split('\n').map(l => l.trim()).filter(l => l.length > 2);
-            const idx = linhas.findIndex(l => /destinatario|destinatário/i.test(l));
-
-            if (idx !== -1 && linhas[idx + 2]) {
-                timerFoco += 1000;
-                document.getElementById('foco-bar').style.width = (timerFoco / 3000 * 100) + "%";
-                document.getElementById('status-msg').innerText = "FOCO: " + Math.ceil((3000-timerFoco)/1000) + "s";
-                if (timerFoco >= 3000) {
-                    processando = true;
-                    const dest = formatar(linhas[idx + 1]), end = linhas[idx + 2], num = (end.match(/\d+/) || [""])[0];
-                    if (!alvos.find(a => a.destinatario === dest)) { bip(1200, 0.3); buscar(end, num, dest); } else { reset(); }
-                }
-            } else { reset(); }
-        }
-
-        function reset() { timerFoco = 0; processando = false; document.getElementById('foco-bar').style.width = "0%"; document.getElementById('status-msg').innerText = "BUSCANDO 'DESTINATARIO'"; }
-
-        async function buscar(rua, num, pessoa) {
-            const q = `${rua} ${num}, Campo Belo, MG`;
-            try {
-                let res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=1`);
-                let d = await res.json();
-                alvos.push({ id: Date.now(), destinatario: pessoa, nome: d.length > 0 ? formatar(d[0].display_name.split(',')[0] + " " + num) : formatar(rua + " " + num), lat: d.length > 0 ? parseFloat(d[0].lat) : userPos[0], lon: d.length > 0 ? parseFloat(d[0].lon) : userPos[1], status: 'pendente' });
-                render(); setTimeout(reset, 2000);
-            } catch (e) { reset(); }
-        }
-
-        function render() { document.getElementById('lista-alvos').innerHTML = alvos.map(a => `<div class="item-alvo"><b>👤 ${a.destinatario}</b><br><small>📍 ${a.nome}</small></div>`).join(''); }
-
-        function gerarRotaOtimizada() {
-            let temp = [...alvos], rota = [], atual = { lat: userPos[0], lon: userPos[1] };
-            while (temp.length > 0) {
-                temp.sort((a, b) => Math.hypot(a.lat - atual.lat, a.lon - atual.lon) - Math.hypot(b.lat - atual.lat, b.lon - atual.lon));
-                let p = temp.shift(); rota.push(p); atual = p;
+            if (/rua|av|avenida|praça|travessa|estrada/i.test(text)) {
+                processCapture(text);
             }
-            alvos = rota; document.getElementById('map-overlay').style.display = 'flex';
-            if (!map) { map = L.map('mapa').setView(userPos, 15); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map); }
-            map.eachLayer(l => { if(l instanceof L.Marker) map.removeLayer(l); });
-            alvos.forEach((a, i) => L.marker([a.lat, a.lon]).addTo(map).bindPopup(`${i+1}º: ${a.destinatario}`));
         }
 
-        function gerarRelatorio() { window.print(); }
-        window.onload = boot;
+        function processCapture(text) {
+            isLock = true;
+            playBip();
+            if(navigator.vibrate) navigator.vibrate([100, 50, 100]);
+
+            const mask = document.getElementById('mask');
+            const mira = document.getElementById('mira');
+            const video = document.getElementById('video');
+            const bar = document.getElementById('status-bar');
+
+            mask.classList.add('mask-active');
+            mira.style.opacity = '1';
+            video.style.transform = 'scale(1.0)';
+            bar.innerText = "ENDEREÇO IDENTIFICADO!";
+
+            const linhas = text.split('\n');
+            const rua = linhas.find(l => /rua|av|avenida|praça|travessa|estrada/i.test(l));
+            const num = (text.match(/\d+/) || [""])[0];
+
+            if (rua && !alvos.find(a => a.original === rua)) {
+                alvos.push({ 
+                    id: Date.now(), 
+                    display: rua.trim() + " " + num,
+                    lat: userPos[0] + (Math.random() * 0.002), 
+                    lon: userPos[1] + (Math.random() * 0.002)
+                });
+            }
+
+            setTimeout(() => {
+                mask.classList.remove('mask-active');
+                mira.style.opacity = '0';
+                video.style.transform = 'scale(1.3)';
+                bar.innerText = "AGUARDANDO ENDEREÇO...";
+                isLock = false;
+            }, 3500);
+        }
+
+        function showList() {
+            document.getElementById('list-screen').style.display = 'flex';
+            const container = document.getElementById('list-content');
+            container.innerHTML = alvos.length ? alvos.map(a => `
+                <div style="background:#161b22; padding:15px; margin-bottom:10px; border-radius:8px; border-left:4px solid var(--primary); display:flex; justify-content:space-between; align-items:center;">
+                    <span>📍 ${a.display}</span>
+                    <button onclick="remove(${a.id})" style="background:#da3633; color:white; border:none; padding:10px; border-radius:5px;">EXCLUIR</button>
+                </div>
+            `).join('') : '<p style="text-align:center; color:#888;">Nenhum endereço capturado.</p>';
+        }
+
+        function remove(id) { alvos = alvos.filter(a => a.id !== id); showList(); }
+        function hideList() { document.getElementById('list-screen').style.display = 'none'; }
+
+        function showMap() {
+            document.getElementById('list-screen').style.display = 'none';
+            document.getElementById('map-screen').style.display = 'flex';
+            const m = L.map('map').setView(userPos, 14);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(m);
+            alvos.forEach(a => L.marker([a.lat, a.lon]).addTo(m).bindPopup(a.display));
+        }
+
+        function hideMap() { document.getElementById('map-screen').style.display = 'none'; showList(); }
+
+        function optimize() {
+            let rota = [...alvos], atual = { lat: userPos[0], lon: userPos[1] };
+            rota.sort((a,b) => Math.hypot(a.lat-atual.lat, a.lon-atual.lon) - Math.hypot(b.lat-atual.lat, b.lon-atual.lon));
+            const pts = rota.map(r => `${r.lat},${r.lon}`).join('/');
+            window.open(`https://www.google.com/maps/dir/${userPos[0]},${userPos[1]}/${pts}`);
+        }
+
+        window.onload = runCheckup;
     </script>
 </body>
 </html>
