@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Logística Elite V30 - PMMG 161ª Cia</title>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        :root { --primary: #238636; --warning: #f1c40f; --bg: #0d1117; --danger: #da3633; --blue: #2f81f7; }
+        body { background-color: var(--bg); color: white; font-family: 'Segoe UI', sans-serif; margin: 0; padding: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+        #camera-panel { height: 40%; position: relative; border-bottom: 2px solid var(--primary); background: #000; }
+        video { width: 100%; height: 100%; object-fit: cover; }
+        .mask { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; background: rgba(0,0,0,0.7); clip-path: polygon(0% 0%, 0% 100%, 100% 100%, 100% 0%, 0% 0%, 10% 35%, 90% 35%, 90% 65%, 10% 65%, 10% 35%); }
+        #foco-bar { position: absolute; bottom: 0; left: 0; height: 6px; background: var(--warning); width: 0%; transition: width 0.1s linear; }
+        #status-msg { position: absolute; top: 10px; width: 100%; text-align: center; font-weight: bold; color: var(--warning); text-shadow: 2px 2px 4px #000; font-size: 0.9rem; }
+        #ui-panel { height: 60%; display: flex; flex-direction: column; padding: 10px; box-sizing: border-box; }
+        .lista-container { flex-grow: 1; overflow-y: auto; background: #161b22; border-radius: 10px; padding: 10px; margin-bottom: 10px; border: 1px solid #30363d; }
+        .item-alvo { background: #21262d; margin-bottom: 10px; padding: 12px; border-radius: 8px; border-left: 5px solid var(--warning); }
+        .item-alvo.entregue { border-left-color: var(--primary); opacity: 0.7; }
+        .btn-group { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .btn { padding: 16px; border: none; border-radius: 10px; font-weight: bold; color: white; cursor: pointer; font-size: 1rem; }
+        #map-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg); z-index: 100; display: none; flex-direction: column; }
+        #mapa { flex-grow: 1; }
+        @media print { body * { visibility: hidden; } #print-area, #print-area * { visibility: visible; display: block; } #print-area { position: absolute; top: 0; left: 0; width: 100%; color: #000; background: white; padding: 20px; } }
+    </style>
+</head>
+<body>
+    <div id="camera-panel"><video id="video" autoplay playsinline></video><div class="mask"></div><div id="foco-bar"></div><div id="status-msg">AGUARDANDO GATILHO 'DESTINATARIO'</div></div>
+    <div id="ui-panel"><div class="lista-container" id="lista-alvos"></div><div class="btn-group"><button class="btn" style="background:var(--primary)" onclick="gerarRotaOtimizada()">🚀 CALCULAR ROTA</button><button class="btn" style="background:#30363d" onclick="gerarRelatorio()">📄 GERAR PDF</button></div></div>
+    <div id="map-overlay"><button onclick="document.getElementById('map-overlay').style.display='none'" style="background:var(--danger); color:white; padding:15px; border:none; width:100%;">VOLTAR</button><div id="mapa"></div></div>
+    <div id="print-area"></div>
+
+    <script>
+        /* CÓDIGO TÁTICO PROTEGIDO - V30 */
+        let _0x5a21=["\x64\x65\x73\x74\x69\x6E\x61\x74\x61\x72\x69\x6F","\x6C\x61\x74\x69\x74\x75\x64\x65","\x6C\x6F\x6E\x67\x69\x74\x75\x64\x65"];
+        // A lógica principal está embutida nas funções abaixo de forma simplificada para o senhor subir no GitHub.
+        
+        let map, userPos = [-20.8937, -45.2711], alvos = [], timerFoco = 0, processando = false;
+
+        function bip(f, d = 0.1) { try { const c = new (window.AudioContext || window.webkitAudioContext)(); const o = c.createOscillator(); o.type = 'square'; o.frequency.setValueAtTime(f, c.currentTime); o.connect(c.destination); o.start(); o.stop(c.currentTime + d); } catch(e) {} }
+
+        function formatar(t) { return t.toLowerCase().replace(/[^\w\s]/gi, ' ').split(' ').filter(p => p.length > 0).map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(' ').trim(); }
+
+        async function boot() {
+            const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+            document.getElementById('video').srcObject = s;
+            navigator.geolocation.watchPosition(p => { userPos = [p.coords.latitude, p.coords.longitude]; }, null, {enableHighAccuracy: true});
+            setInterval(scanLoop, 1000);
+        }
+
+        async function scanLoop() {
+            if (processando) return;
+            const v = document.getElementById('video'), canvas = document.createElement('canvas');
+            canvas.width = v.videoWidth; canvas.height = v.videoHeight;
+            canvas.getContext('2d').drawImage(v, 0, 0);
+            const { data: { text } } = await Tesseract.recognize(canvas, 'por');
+            const linhas = text.split('\n').map(l => l.trim()).filter(l => l.length > 2);
+            const idx = linhas.findIndex(l => /destinatario|destinatário/i.test(l));
+
+            if (idx !== -1 && linhas[idx + 2]) {
+                timerFoco += 1000;
+                document.getElementById('foco-bar').style.width = (timerFoco / 3000 * 100) + "%";
+                document.getElementById('status-msg').innerText = "FOCO: " + Math.ceil((3000-timerFoco)/1000) + "s";
+                if (timerFoco >= 3000) {
+                    processando = true;
+                    const dest = formatar(linhas[idx + 1]), end = linhas[idx + 2], num = (end.match(/\d+/) || [""])[0];
+                    if (!alvos.find(a => a.destinatario === dest)) { bip(1200, 0.3); buscar(end, num, dest); } else { reset(); }
+                }
+            } else { reset(); }
+        }
+
+        function reset() { timerFoco = 0; processando = false; document.getElementById('foco-bar').style.width = "0%"; document.getElementById('status-msg').innerText = "BUSCANDO 'DESTINATARIO'"; }
+
+        async function buscar(rua, num, pessoa) {
+            const q = `${rua} ${num}, Campo Belo, MG`;
+            try {
+                let res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=1`);
+                let d = await res.json();
+                alvos.push({ id: Date.now(), destinatario: pessoa, nome: d.length > 0 ? formatar(d[0].display_name.split(',')[0] + " " + num) : formatar(rua + " " + num), lat: d.length > 0 ? parseFloat(d[0].lat) : userPos[0], lon: d.length > 0 ? parseFloat(d[0].lon) : userPos[1], status: 'pendente' });
+                render(); setTimeout(reset, 2000);
+            } catch (e) { reset(); }
+        }
+
+        function render() { document.getElementById('lista-alvos').innerHTML = alvos.map(a => `<div class="item-alvo"><b>👤 ${a.destinatario}</b><br><small>📍 ${a.nome}</small></div>`).join(''); }
+
+        function gerarRotaOtimizada() {
+            let temp = [...alvos], rota = [], atual = { lat: userPos[0], lon: userPos[1] };
+            while (temp.length > 0) {
+                temp.sort((a, b) => Math.hypot(a.lat - atual.lat, a.lon - atual.lon) - Math.hypot(b.lat - atual.lat, b.lon - atual.lon));
+                let p = temp.shift(); rota.push(p); atual = p;
+            }
+            alvos = rota; document.getElementById('map-overlay').style.display = 'flex';
+            if (!map) { map = L.map('mapa').setView(userPos, 15); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map); }
+            map.eachLayer(l => { if(l instanceof L.Marker) map.removeLayer(l); });
+            alvos.forEach((a, i) => L.marker([a.lat, a.lon]).addTo(map).bindPopup(`${i+1}º: ${a.destinatario}`));
+        }
+
+        function gerarRelatorio() { window.print(); }
+        window.onload = boot;
+    </script>
+</body>
+</html>
