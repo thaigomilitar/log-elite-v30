@@ -2,233 +2,148 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
+    <title>Logística Vision V39.1</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Logística Vision V36</title>
     
-    <link rel="apple-touch-icon" href="logo.jpeg">
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <link rel="icon" sizes="192x192" href="logo.jpeg">
-
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <style>
-        :root { --primary: #ff4500; --bg: #000; --safety: #238636; }
-        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; color: white; font-family: sans-serif; overflow: hidden; }
+        :root { --accent: #00ff41; --bg: #050505; --card: #121212; }
+        body { margin: 0; background: var(--bg); color: white; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
 
-        /* TELA DE SPLASH (LOGOMARCA EM TELA CHEIA) */
-        #splash {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: #000 url('logo.jpeg') no-repeat center center;
-            background-size: contain; z-index: 9999;
-            display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
-            padding-bottom: 50px; transition: opacity 0.8s;
+        /* MIRA DINÂMICA */
+        #mira {
+            position: absolute; border: 2px solid var(--accent);
+            border-radius: 12px; pointer-events: none; z-index: 100;
+            display: none; transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 0 20px var(--accent);
         }
 
-        #check-list { background: rgba(0,0,0,0.8); padding: 15px; border-radius: 10px; font-size: 12px; width: 80%; border: 1px solid var(--primary); }
-        .check-item { margin: 5px 0; color: #888; }
-        .check-ok { color: var(--safety); font-weight: bold; }
-
-        /* VIEWPORT E IA */
-        #viewport { position: relative; width: 100%; height: 100%; }
-        video { width: 100%; height: 100%; object-fit: cover; transform: scale(1.3); transition: transform 0.4s; }
-
-        #mask {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            pointer-events: none; z-index: 20; transition: all 0.4s;
-        }
+        video { width: 100%; height: 100vh; object-fit: cover; }
         
-        .mask-active {
-            background: rgba(0,0,0,0.9);
-            clip-path: polygon(0% 0%, 0% 100%, 100% 100%, 100% 0%, 0% 0%, 
-                               5% 45%, 95% 45%, 95% 55%, 5% 55%, 5% 45%);
-        }
-
-        .mira {
-            position: absolute; top: 45%; left: 5%; width: 90%; height: 10%;
-            border: 2px solid var(--primary); z-index: 21; opacity: 0;
-            box-shadow: 0 0 20px var(--primary); transition: opacity 0.3s;
-        }
-
-        /* BOTÃO FLUTUANTE (ÍCONE DA LOGO) */
+        /* BOTÃO FLUTUANTE LOGO */
         .fab {
             position: fixed; bottom: 30px; right: 30px;
-            width: 75px; height: 75px;
+            width: 70px; height: 70px;
             background: url('logo.jpeg') center/cover;
-            border-radius: 50%; border: 3px solid var(--primary); z-index: 100;
-            box-shadow: 0 10px 20px rgba(0,0,0,0.8);
+            border-radius: 50%; border: 3px solid var(--accent); z-index: 200;
+            box-shadow: 0 0 15px rgba(0,255,65,0.4);
         }
 
-        #status-bar { position: absolute; bottom: 120px; width: 100%; text-align: center; color: var(--primary); font-weight: bold; z-index: 50; text-shadow: 2px 2px 4px #000; }
-        
-        .screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 200; display: none; flex-direction: column; padding: 20px; box-sizing: border-box; }
+        #status { position: fixed; top: 20px; width: 100%; text-align: center; color: var(--accent); font-weight: bold; z-index: 50; text-shadow: 2px 2px 4px #000; }
+
+        /* TELA DE RELATÓRIO */
+        .screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--bg); display: none; flex-direction: column; padding: 25px;
+            box-sizing: border-box; z-index: 300;
+        }
+        .item { background: var(--card); padding: 15px; border-radius: 10px; margin-bottom: 10px; border-left: 4px solid var(--accent); }
     </style>
 </head>
 <body>
 
-    <div id="splash">
-        <div id="check-list">
-            <div id="chk-cam" class="check-item">SISTEMA ÓPTICO...</div>
-            <div id="chk-gps" class="check-item">LOCALIZAÇÃO...</div>
-            <div id="chk-snd" class="check-item">ALERTA SONORO...</div>
-            <div id="chk-ia" class="check-item">IA LOGÍSTICA...</div>
-        </div>
-    </div>
+    <div id="status">INICIALIZANDO GEMINI 2.0 LITE...</div>
+    <video id="video" autoplay playsinline></video>
+    <div id="mira"></div>
 
-    <div id="viewport">
-        <video id="video" autoplay playsinline></video>
-        <div id="mask"></div>
-        <div id="mira" class="mira"></div>
-        <div id="status-bar">AGUARDANDO ENDEREÇO...</div>
-        <div class="fab" onclick="showList()"></div>
-    </div>
+    <div class="fab" onclick="abrirGestao()"></div>
 
-    <div id="list-screen" class="screen">
-        <h2 style="color: var(--primary); border-bottom: 2px solid var(--primary); padding-bottom: 10px;">📦 GERENCIAR ENTREGAS</h2>
-        <div id="list-content" style="flex:1; overflow-y:auto; margin-top:10px;"></div>
-        <button style="padding:20px; background:var(--safety); color:white; border:none; border-radius:10px; font-weight:bold; font-size: 16px;" onclick="showMap()">CONFIRMAR E VER MAPA</button>
-        <button style="margin-top:10px; padding:15px; background:#222; color:white; border:none; border-radius:10px;" onclick="hideList()">VOLTAR AO SCANNER</button>
-    </div>
-
-    <div id="map-screen" class="screen" style="padding:0;">
-        <div id="map" style="width: 100%; height: 100%;"></div>
-        <button style="position:absolute; top:20px; left:50%; transform:translateX(-50%); z-index:1000; padding:18px; background:var(--primary); border:none; border-radius:40px; color:white; font-weight:bold; display:flex; align-items:center; gap:10px; box-shadow: 0 4px 15px rgba(0,0,0,0.5);" onclick="optimize()">
-            <img src="logo.jpeg" style="width:30px; height:30px; border-radius:50%;"> OTIMIZAR ROTA AGORA
-        </button>
-        <button style="position:absolute; bottom:20px; left:20px; z-index:1000; padding:12px; background:white; color:black; border:none; border-radius:10px; font-weight:bold;" onclick="hideMap()">EDITAR LISTA</button>
+    <div id="gestao" class="screen">
+        <h2 style="color: var(--accent);">📦 Relatório de Campo</h2>
+        <div id="lista-entregas" style="flex: 1; overflow-y: auto;"></div>
+        <button onclick="gerarPDF()" style="width: 100%; padding: 20px; background: var(--accent); border: none; border-radius: 12px; font-weight: bold; margin-bottom: 10px;">COMPARTILHAR PDF (WHATSAPP)</button>
+        <button onclick="fecharGestao()" style="width: 100%; padding: 15px; background: #222; border: none; color: white; border-radius: 12px;">VOLTAR AO SCANNER</button>
     </div>
 
     <script>
-        let alvos = [], userPos = [-20.8937, -45.2711], isLock = false, audioCtx = null;
+        const API_KEY = "AIzaSyCoIrsaFgIMUAvl2Ps7_G2cT9zCh5zhsus";
+        let entregas = [];
+        let contagem = {};
 
-        async function runCheckup() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-                document.getElementById('video').srcObject = stream;
-                updateCheck('chk-cam', 'OK');
-
-                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                updateCheck('chk-snd', 'OK');
-
-                navigator.geolocation.getCurrentPosition(p => {
-                    userPos = [p.coords.latitude, p.coords.longitude];
-                    updateCheck('chk-gps', 'OK');
-                }, () => updateCheck('chk-gps', 'ERRO GPS'));
-
-                updateCheck('chk-ia', 'PRONTA');
-
-                setTimeout(() => {
-                    document.getElementById('splash').style.opacity = '0';
-                    setTimeout(() => document.getElementById('splash').style.display = 'none', 800);
-                    setInterval(iaBrain, 1500);
-                }, 2500);
-
-            } catch (e) {
-                alert("ERRO: O site precisa de HTTPS e permissão de Câmera/GPS.");
-            }
+        // 1. MOTOR DE VOZ E ÁUDIO
+        function alertar(texto) {
+            const msg = new SpeechSynthesisUtterance(texto);
+            msg.lang = 'pt-BR';
+            window.speechSynthesis.speak(msg);
         }
 
-        function updateCheck(id, status) {
-            const el = document.getElementById(id);
-            el.innerHTML = `${el.innerText} [${status}]`;
-            el.className = 'check-item check-ok';
-        }
-
-        function playBip() {
-            if (!audioCtx) return;
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.connect(gain); gain.connect(audioCtx.destination);
-            osc.frequency.value = 950;
-            osc.start();
-            gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.4);
-            osc.stop(audioCtx.currentTime + 0.4);
-        }
-
-        async function iaBrain() {
-            if (isLock || document.getElementById('list-screen').style.display === 'flex') return;
-            const v = document.getElementById('video');
-            const canvas = document.createElement('canvas');
-            canvas.width = v.videoWidth; canvas.height = v.videoHeight;
-            canvas.getContext('2d').drawImage(v, 0, 0);
-
-            const { data: { text } } = await Tesseract.recognize(canvas, 'por');
-            if (/rua|av|avenida|praça|travessa|estrada/i.test(text)) {
-                processCapture(text);
-            }
-        }
-
-        function processCapture(text) {
-            isLock = true;
-            playBip();
-            if(navigator.vibrate) navigator.vibrate([100, 50, 100]);
-
-            const mask = document.getElementById('mask');
-            const mira = document.getElementById('mira');
+        // 2. INTEGRAÇÃO GEMINI 2.0 FLASH LITE
+        async function capturarEtiqueta() {
             const video = document.getElementById('video');
-            const bar = document.getElementById('status-bar');
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0);
+            const base64Image = canvas.toDataURL('image/jpeg').split(',')[1];
 
-            mask.classList.add('mask-active');
-            mira.style.opacity = '1';
-            video.style.transform = 'scale(1.0)';
-            bar.innerText = "ENDEREÇO IDENTIFICADO!";
-
-            const linhas = text.split('\n');
-            const rua = linhas.find(l => /rua|av|avenida|praça|travessa|estrada/i.test(l));
-            const num = (text.match(/\d+/) || [""])[0];
-
-            if (rua && !alvos.find(a => a.original === rua)) {
-                alvos.push({ 
-                    id: Date.now(), 
-                    display: rua.trim() + " " + num,
-                    lat: userPos[0] + (Math.random() * 0.002), 
-                    lon: userPos[1] + (Math.random() * 0.002)
+            try {
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite-preview-02-05:generateContent?key=${API_KEY}`, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: "Analise esta etiqueta. Extraia estritamente o NOME do destinatário e o ENDEREÇO. Se houver mais de um pacote para o mesmo nome, ignore. Responda em JSON: {nome: '', endereco: ''}" }, { inline_data: { mime_type: "image/jpeg", data: base64Image } }] }]
+                    })
                 });
+                
+                const data = await response.json();
+                const resultado = JSON.parse(data.candidates[0].content.parts[0].text.replace(/```json|```/g, ""));
+                
+                processarResultado(resultado.nome, resultado.endereco);
+            } catch (e) { console.log("Erro na leitura"); }
+        }
+
+        function processarResultado(nome, endereco) {
+            if (!nome || !endereco) return;
+            
+            const id = nome + endereco;
+            if (contagem[id]) {
+                contagem[id]++;
+                alertar(`Atenção Thiago, é o ${contagem[id]}º pacote para ${nome}`);
+            } else {
+                contagem[id] = 1;
+                entregas.push({ nome, endereco, hora: new Date().toLocaleTimeString() });
+                document.getElementById('status').innerText = "✅ CAPTURADO: " + nome;
+                ativarMira();
+                // Bip de sucesso
             }
-
-            setTimeout(() => {
-                mask.classList.remove('mask-active');
-                mira.style.opacity = '0';
-                video.style.transform = 'scale(1.3)';
-                bar.innerText = "AGUARDANDO ENDEREÇO...";
-                isLock = false;
-            }, 3500);
         }
 
-        function showList() {
-            document.getElementById('list-screen').style.display = 'flex';
-            const container = document.getElementById('list-content');
-            container.innerHTML = alvos.length ? alvos.map(a => `
-                <div style="background:#161b22; padding:15px; margin-bottom:10px; border-radius:8px; border-left:4px solid var(--primary); display:flex; justify-content:space-between; align-items:center;">
-                    <span>📍 ${a.display}</span>
-                    <button onclick="remove(${a.id})" style="background:#da3633; color:white; border:none; padding:10px; border-radius:5px;">EXCLUIR</button>
+        function ativarMira() {
+            const mira = document.getElementById('mira');
+            mira.style.display = 'block';
+            mira.style.top = '45%'; mira.style.left = '10%'; mira.style.width = '80%'; mira.style.height = '10%';
+            setTimeout(() => { mira.style.display = 'none'; document.getElementById('status').innerText = "AGUARDANDO PRÓXIMO..."; }, 2000);
+        }
+
+        // 3. PDF E GESTÃO
+        function gerarPDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            doc.text("LOGÍSTICA ELITE - RELATÓRIO DE ENTREGAS", 20, 20);
+            entregas.forEach((e, i) => {
+                doc.text(`${i+1}. ${e.nome} - ${e.endereco} [${e.hora}]`, 20, 40 + (i * 10));
+            });
+            doc.save("entregas_dia.pdf");
+        }
+
+        function abrirGestao() { document.getElementById('gestao').style.display = 'flex'; renderLista(); }
+        function fecharGestao() { document.getElementById('gestao').style.display = 'none'; }
+        function renderLista() {
+            document.getElementById('lista-entregas').innerHTML = entregas.map(e => `
+                <div class="item">
+                    <b>👤 ${e.nome}</b><br>
+                    <small>📍 ${e.endereco}</small>
                 </div>
-            `).join('') : '<p style="text-align:center; color:#888;">Nenhum endereço capturado.</p>';
+            `).join('');
         }
 
-        function remove(id) { alvos = alvos.filter(a => a.id !== id); showList(); }
-        function hideList() { document.getElementById('list-screen').style.display = 'none'; }
-
-        function showMap() {
-            document.getElementById('list-screen').style.display = 'none';
-            document.getElementById('map-screen').style.display = 'flex';
-            const m = L.map('map').setView(userPos, 14);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(m);
-            alvos.forEach(a => L.marker([a.lat, a.lon]).addTo(m).bindPopup(a.display));
-        }
-
-        function hideMap() { document.getElementById('map-screen').style.display = 'none'; showList(); }
-
-        function optimize() {
-            let rota = [...alvos], atual = { lat: userPos[0], lon: userPos[1] };
-            rota.sort((a,b) => Math.hypot(a.lat-atual.lat, a.lon-atual.lon) - Math.hypot(b.lat-atual.lat, b.lon-atual.lon));
-            const pts = rota.map(r => `${r.lat},${r.lon}`).join('/');
-            window.open(`https://www.google.com/maps/dir/${userPos[0]},${userPos[1]}/${pts}`);
-        }
-
-        window.onload = runCheckup;
+        // Inicialização
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+            .then(s => { 
+                document.getElementById('video').srcObject = s;
+                setInterval(capturarEtiqueta, 4000); // Tira uma foto a cada 4s
+            });
     </script>
 </body>
 </html>
