@@ -3,63 +3,75 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Elite Vision V43.0 - Flash Speed</title>
+    <title>Elite Vision V43.1 - FLASH</title>
     <style>
-        :root { --accent: #00ff41; }
+        :root { --accent: #00ff41; --bg: #000; }
         body { margin: 0; background: #000; color: white; font-family: sans-serif; overflow: hidden; }
-        #status { position: fixed; top: 0; width: 100%; text-align: center; z-index: 100; font-weight: bold; background: rgba(0,0,0,0.9); padding: 20px; color: var(--accent); border-bottom: 2px solid #333; }
+        #status { position: fixed; top: 0; width: 100%; text-align: center; z-index: 100; font-weight: bold; background: rgba(0,0,0,0.9); padding: 20px; color: var(--accent); border-bottom: 2px solid #333; font-size: 1.1em; }
         video { width: 100%; height: 100vh; object-fit: cover; }
         .mira { position: absolute; top: 40%; left: 10%; width: 80%; height: 20%; border: 2px solid var(--accent); border-radius: 12px; pointer-events: none; z-index: 50; box-shadow: 0 0 20px var(--accent); }
         #setup { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
-        input { width: 100%; padding: 15px; margin: 20px 0; background: #111; border: 1px solid var(--accent); color: white; border-radius: 10px; text-align: center; }
-        button { background: var(--accent); color: black; border: none; padding: 15px 30px; border-radius: 10px; font-weight: bold; width: 100%; cursor: pointer; }
+        .card { text-align: center; border: 2px solid var(--accent); padding: 25px; border-radius: 20px; width: 100%; max-width: 350px; background: #111; }
+        input { width: 100%; padding: 15px; margin: 20px 0; background: #000; border: 1px solid #444; color: var(--accent); border-radius: 10px; text-align: center; box-sizing: border-box; font-size: 16px; }
+        button { background: var(--accent); color: black; border: none; padding: 15px; border-radius: 10px; font-weight: bold; width: 100%; cursor: pointer; font-size: 16px; }
     </style>
 </head>
 <body>
 
     <div id="setup" style="display: none;">
-        <div style="text-align: center; border: 1px solid var(--accent); padding: 25px; border-radius: 20px; width: 100%; max-width: 350px;">
-            <h3 style="margin-top:0">CONECTAR SISTEMA</h3>
-            <input type="text" id="keyInput" placeholder="Cole sua chave aqui">
-            <button onclick="salvar()">ATIVAR SCANNER</button>
+        <div class="card">
+            <h2 style="margin-top:0; color: var(--accent);">FLASH ACTIVATE</h2>
+            <p style="font-size: 14px; color: #888;">Cole sua chave API abaixo:</p>
+            <input type="text" id="keyInput" placeholder="AIzaSy...">
+            <button onclick="salvar()">CONECTAR AGORA</button>
         </div>
     </div>
 
-    <div id="status">INICIALIZANDO...</div>
+    <div id="status">SISTEMA INICIANDO...</div>
     <video id="video" autoplay playsinline></video>
     <div class="mira"></div>
 
     <script>
-        const KEY_STORE = 'gemini_v43_final';
-        let API_KEY = localStorage.getItem(KEY_STORE);
+        // Usei um nome de chave novo para não dar conflito com a anterior
+        const STORAGE_KEY = 'gemini_flash_v43';
+        let API_KEY = localStorage.getItem(STORAGE_KEY);
         let processando = false;
 
         window.onload = () => {
-            if (!API_KEY) document.getElementById('setup').style.display = 'flex';
-            else iniciar();
+            if (!API_KEY) {
+                document.getElementById('setup').style.display = 'flex';
+            } else {
+                iniciar();
+            }
         };
 
         function salvar() {
             const val = document.getElementById('keyInput').value.trim();
             if (val.length > 20) {
-                localStorage.setItem(KEY_STORE, val);
+                localStorage.setItem(STORAGE_KEY, val);
                 location.reload();
             }
         }
 
         async function iniciar() {
             try {
-                const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-                document.getElementById('video').srcObject = s;
-                document.getElementById('status').innerText = "SISTEMA ONLINE (FLASH)";
-                setInterval(analisar, 5000); // Mais rápido que o Pro!
-            } catch (e) { document.getElementById('status').innerText = "ERRO NA CÂMERA"; }
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: "environment", focusMode: "continuous" } 
+                });
+                document.getElementById('video').srcObject = stream;
+                document.getElementById('status').innerText = "FLASH ONLINE - MIRE NO PACOTE";
+                
+                // O Flash é rápido, vamos tentar ler a cada 5 segundos
+                setInterval(capturarEProcessar, 5000);
+            } catch (e) {
+                document.getElementById('status').innerText = "ERRO: ACESSO À CÂMERA";
+            }
         }
 
-        async function analisar() {
+        async function capturarEProcessar() {
             if (processando || !API_KEY) return;
             processando = true;
-            document.getElementById('status').innerText = "IA LENDO ETIQUETA...";
+            document.getElementById('status').innerText = "LENDO ETIQUETA...";
 
             try {
                 const v = document.getElementById('video');
@@ -68,28 +80,40 @@
                 canvas.getContext('2d').drawImage(v, 0, 0, 1024, 768);
                 const base64 = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
 
-                // Mudança para o modelo 1.5 Flash para garantir o funcionamento imediato
+                // CHAMADA DIRETA PARA O MODELO FLASH (V1BETA)
                 const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ contents: [{ parts: [{ text: "Extraia o NOME e o ENDEREÇO. Retorne JSON: {nome:'', endereco:''}" }, { inline_data: { mime_type: "image/jpeg", data: base64 } }] }] })
+                    body: JSON.stringify({
+                        contents: [{ parts: [
+                            { text: "Extraia o NOME e o ENDEREÇO desta etiqueta. Retorne APENAS um JSON limpo: {nome: '', endereco: ''}" },
+                            { inline_data: { mime_type: "image/jpeg", data: base64 } }
+                        ]}]
+                    })
                 });
 
                 const data = await r.json();
 
                 if (data.error) {
-                    document.getElementById('status').innerText = "ERRO: " + data.error.message;
+                    // Se o erro de saldo/chave persistir aqui, o app vai te avisar
+                    document.getElementById('status').innerText = "ERRO GOOGLE: " + data.error.message;
                 } else {
                     const texto = data.candidates[0].content.parts[0].text;
                     const res = JSON.parse(texto.replace(/```json|```/g, "").trim());
+                    
                     if (res.nome) {
                         document.getElementById('status').innerText = "✅ " + res.nome.toUpperCase();
-                        window.speechSynthesis.speak(new SpeechSynthesisUtterance(res.nome));
+                        const fala = new SpeechSynthesisUtterance(res.nome);
+                        window.speechSynthesis.speak(fala);
+                    } else {
+                        document.getElementById('status').innerText = "Buscando dados...";
                     }
                 }
-            } catch (e) {
-                document.getElementById('status').innerText = "PROCESSANDO...";
-            } finally { processando = false; }
+            } catch (err) {
+                document.getElementById('status').innerText = "ANALISANDO...";
+            } finally {
+                setTimeout(() => { processando = false; }, 2000);
+            }
         }
     </script>
 </body>
