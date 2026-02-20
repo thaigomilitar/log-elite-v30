@@ -3,118 +3,107 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Elite Vision V43.1 - FLASH</title>
+    <title>Elite Vision 43.2</title>
     <style>
-        :root { --accent: #00ff41; --bg: #000; }
-        body { margin: 0; background: #000; color: white; font-family: sans-serif; overflow: hidden; }
-        #status { position: fixed; top: 0; width: 100%; text-align: center; z-index: 100; font-weight: bold; background: rgba(0,0,0,0.9); padding: 20px; color: var(--accent); border-bottom: 2px solid #333; font-size: 1.1em; }
+        :root { --accent: #00ff41; }
+        body { margin: 0; background: #000; color: #fff; font-family: sans-serif; text-align: center; }
+        #status { position: fixed; top: 0; width: 100%; padding: 20px; background: rgba(0,0,0,0.9); color: var(--accent); font-weight: bold; z-index: 100; border-bottom: 2px solid #333; }
         video { width: 100%; height: 100vh; object-fit: cover; }
-        .mira { position: absolute; top: 40%; left: 10%; width: 80%; height: 20%; border: 2px solid var(--accent); border-radius: 12px; pointer-events: none; z-index: 50; box-shadow: 0 0 20px var(--accent); }
-        #setup { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
-        .card { text-align: center; border: 2px solid var(--accent); padding: 25px; border-radius: 20px; width: 100%; max-width: 350px; background: #111; }
-        input { width: 100%; padding: 15px; margin: 20px 0; background: #000; border: 1px solid #444; color: var(--accent); border-radius: 10px; text-align: center; box-sizing: border-box; font-size: 16px; }
-        button { background: var(--accent); color: black; border: none; padding: 15px; border-radius: 10px; font-weight: bold; width: 100%; cursor: pointer; font-size: 16px; }
+        #setup { position: fixed; inset: 0; background: #000; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
+        .box { border: 2px solid var(--accent); padding: 20px; border-radius: 15px; width: 100%; max-width: 320px; background: #111; }
+        input { width: 100%; padding: 15px; margin: 15px 0; border-radius: 8px; border: 1px solid #444; background: #000; color: var(--accent); box-sizing: border-box; }
+        button { width: 100%; padding: 15px; border-radius: 8px; border: none; background: var(--accent); font-weight: bold; cursor: pointer; }
     </style>
 </head>
 <body>
 
-    <div id="setup" style="display: none;">
-        <div class="card">
-            <h2 style="margin-top:0; color: var(--accent);">FLASH ACTIVATE</h2>
-            <p style="font-size: 14px; color: #888;">Cole sua chave API abaixo:</p>
-            <input type="text" id="keyInput" placeholder="AIzaSy...">
-            <button onclick="salvar()">CONECTAR AGORA</button>
-        </div>
+<div id="setup" style="display: none;">
+    <div class="box">
+        <h2 style="color: var(--accent)">SISTEMA ATIVO</h2>
+        <p>Cole a Chave do Google:</p>
+        <input type="text" id="apiKey" placeholder="AIzaSy...">
+        <button onclick="save()">CONECTAR IA</button>
     </div>
+</div>
 
-    <div id="status">SISTEMA INICIANDO...</div>
-    <video id="video" autoplay playsinline></video>
-    <div class="mira"></div>
+<div id="status">INICIANDO...</div>
+<video id="video" autoplay playsinline></video>
 
-    <script>
-        // Usei um nome de chave novo para não dar conflito com a anterior
-        const STORAGE_KEY = 'gemini_flash_v43';
-        let API_KEY = localStorage.getItem(STORAGE_KEY);
-        let processando = false;
+<script>
+    // Nome de storage novo para forçar limpeza de lixo anterior
+    const STORAGE = 'gemini_final_v432';
+    let KEY = localStorage.getItem(STORAGE);
+    let busy = false;
 
-        window.onload = () => {
-            if (!API_KEY) {
-                document.getElementById('setup').style.display = 'flex';
+    window.onload = () => {
+        if (!KEY) document.getElementById('setup').style.display = 'flex';
+        else start();
+    };
+
+    function save() {
+        const val = document.getElementById('apiKey').value.trim(); // Trim remove espaços extras
+        if (val.length > 20) {
+            localStorage.setItem(STORAGE, val);
+            location.reload();
+        } else {
+            alert("Chave muito curta!");
+        }
+    }
+
+    async function start() {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+            document.getElementById('video').srcObject = stream;
+            document.getElementById('status').innerText = "FLASH ONLINE";
+            setInterval(scan, 5000);
+        } catch (e) {
+            document.getElementById('status').innerText = "ERRO: LIGUE A CÂMERA";
+        }
+    }
+
+    async function scan() {
+        if (busy || !KEY) return;
+        busy = true;
+        document.getElementById('status').innerText = "LENDO...";
+
+        try {
+            const v = document.getElementById('video');
+            const canvas = document.createElement('canvas');
+            canvas.width = 800; canvas.height = 600;
+            canvas.getContext('2d').drawImage(v, 0, 0, 800, 600);
+            const base64 = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
+
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${KEY}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ parts: [
+                        { text: "Extraia Nome e Endereço em JSON: {nome:'', endereco:''}" },
+                        { inline_data: { mime_type: "image/jpeg", data: base64 } }
+                    ]}]
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.error) {
+                // Se a chave for inválida, ele vai mostrar o erro do Google aqui
+                document.getElementById('status').innerText = "GOOGLE DIZ: " + data.error.message;
             } else {
-                iniciar();
-            }
-        };
-
-        function salvar() {
-            const val = document.getElementById('keyInput').value.trim();
-            if (val.length > 20) {
-                localStorage.setItem(STORAGE_KEY, val);
-                location.reload();
-            }
-        }
-
-        async function iniciar() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: "environment", focusMode: "continuous" } 
-                });
-                document.getElementById('video').srcObject = stream;
-                document.getElementById('status').innerText = "FLASH ONLINE - MIRE NO PACOTE";
-                
-                // O Flash é rápido, vamos tentar ler a cada 5 segundos
-                setInterval(capturarEProcessar, 5000);
-            } catch (e) {
-                document.getElementById('status').innerText = "ERRO: ACESSO À CÂMERA";
-            }
-        }
-
-        async function capturarEProcessar() {
-            if (processando || !API_KEY) return;
-            processando = true;
-            document.getElementById('status').innerText = "LENDO ETIQUETA...";
-
-            try {
-                const v = document.getElementById('video');
-                const canvas = document.createElement('canvas');
-                canvas.width = 1024; canvas.height = 768;
-                canvas.getContext('2d').drawImage(v, 0, 0, 1024, 768);
-                const base64 = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
-
-                // CHAMADA DIRETA PARA O MODELO FLASH (V1BETA)
-                const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: [{ parts: [
-                            { text: "Extraia o NOME e o ENDEREÇO desta etiqueta. Retorne APENAS um JSON limpo: {nome: '', endereco: ''}" },
-                            { inline_data: { mime_type: "image/jpeg", data: base64 } }
-                        ]}]
-                    })
-                });
-
-                const data = await r.json();
-
-                if (data.error) {
-                    // Se o erro de saldo/chave persistir aqui, o app vai te avisar
-                    document.getElementById('status').innerText = "ERRO GOOGLE: " + data.error.message;
+                const res = JSON.parse(data.candidates[0].content.parts[0].text.replace(/```json|```/g, "").trim());
+                if (res.nome) {
+                    document.getElementById('status').innerText = "✅ " + res.nome.toUpperCase();
+                    window.speechSynthesis.speak(new SpeechSynthesisUtterance(res.nome));
                 } else {
-                    const texto = data.candidates[0].content.parts[0].text;
-                    const res = JSON.parse(texto.replace(/```json|```/g, "").trim());
-                    
-                    if (res.nome) {
-                        document.getElementById('status').innerText = "✅ " + res.nome.toUpperCase();
-                        const fala = new SpeechSynthesisUtterance(res.nome);
-                        window.speechSynthesis.speak(fala);
-                    } else {
-                        document.getElementById('status').innerText = "Buscando dados...";
-                    }
+                    document.getElementById('status').innerText = "BUSCANDO...";
                 }
-            } catch (err) {
-                document.getElementById('status').innerText = "ANALISANDO...";
-            } finally {
-                setTimeout(() => { processando = false; }, 2000);
             }
+        } catch (e) {
+            document.getElementById('status').innerText = "TENTANDO NOVAMENTE...";
+        } finally {
+            busy = false;
         }
-    </script>
+    }
+</script>
 </body>
 </html>
